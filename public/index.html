@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lichess Tournament Analyzer</title>
+<style>
+  :root { --bg: #f8f9fa; --surface: #fff; --text: #1a1a2e; --muted: #6c757d; --primary: #0a7ea4; --primary-hover: #086b8a; --success: #22c55e; --warning: #f59e0b; --error: #ef4444; --border: #e5e7eb; --radius: 12px; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 2rem; text-align: center; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: var(--muted); margin-bottom: 32px; font-size: 0.95rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 16px; }
+  label { font-size: 0.875rem; font-weight: 600; display: block; margin-bottom: 8px; }
+  input[type="text"] { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+  input[type="text"]:focus { border-color: var(--primary); }
+  .btn { display: block; width: 100%; padding: 14px; background: var(--primary); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
+  .btn:hover { background: var(--primary-hover); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--bg); }
+  .error { color: var(--error); font-size: 0.875rem; margin-top: 8px; }
+  .info-banner { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .info-banner p { font-size: 0.8rem; color: var(--muted); margin: 2px 0; }
+  .info-banner .warn { color: var(--warning); }
+  .info-banner .ok { color: var(--success); }
+  .info-banner .title { font-size: 0.875rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .metric .label { font-size: 0.7rem; text-transform: uppercase; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; }
+  .metric .player { font-size: 1.25rem; font-weight: 700; margin: 4px 0; }
+  .metric .value { font-size: 1.5rem; font-weight: 800; }
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .results-header { text-align: center; margin-bottom: 16px; }
+  .results-header h2 { font-size: 1.5rem; }
+  .results-header p { color: var(--muted); font-size: 0.9rem; }
+  .actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .actions .btn { flex: 1; min-width: 140px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { font-weight: 600; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; position: sticky; top: 0; background: var(--surface); }
+  .table-wrap { max-height: 500px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none; }
+  .search-input { margin-bottom: 12px; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: var(--surface); border-radius: var(--radius); padding: 24px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto; }
+  .modal h3 { margin-bottom: 16px; }
+  .modal-close { float: right; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--muted); }
+  .team-card { background: var(--bg); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+  .team-card h4 { margin-bottom: 4px; }
+  .team-card p { font-size: 0.85rem; color: var(--muted); }
+  @media (max-width: 500px) { .metrics-grid { grid-template-columns: 1fr; } .actions { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- INPUT SCREEN -->
+  <div id="input-screen">
+    <h1>Lichess Analyzer</h1>
+    <p class="subtitle">Analysez les tournois Lichess et découvrez des statistiques détaillées pour remettre des prix personnalisés</p>
+    <div class="card">
+      <label>Lien du tournoi</label>
+      <input type="text" id="url-input" placeholder="https://lichess.org/tournament/... ou /swiss/...">
+      <div id="error-msg" class="error hidden"></div>
+    </div>
+    <button class="btn" id="analyze-btn" onclick="analyze()">Analyser le tournoi</button>
+    <div class="card" style="margin-top:16px">
+      <p style="font-size:0.875rem;font-weight:600;margin-bottom:6px">Comment ça marche</p>
+      <p style="font-size:0.85rem;color:var(--muted);line-height:1.6">
+        L'analyse utilise les données d'analyse Lichess. Pour que les résultats soient fiables, demandez aux joueurs d'analyser leurs parties sur Lichess (bouton "Analyse informatique", c'est gratuit). Les parties très courtes (timeouts) sont ignorées.<br><br>
+        • Imprécisions (perte 50-100 centipawns)<br>
+        • Erreurs (perte 100-300 centipawns)<br>
+        • Gaffes (perte 300+ centipawns)<br>
+        • Taux de précision moyen<br>
+        • Seuil d'éligibilité : ≥4 parties analysées et ≥50%
+      </p>
+    </div>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div id="results-screen" class="hidden">
+    <div class="results-header">
+      <h2>Résultats</h2>
+      <p id="r-name"></p>
+      <p id="r-info"></p>
+    </div>
+    <div id="info-banner" class="info-banner"></div>
+    <div id="metrics-grid" class="metrics-grid"></div>
+    <div class="actions">
+      <button class="btn" onclick="openSearch()">Rechercher un joueur</button>
+      <button class="btn btn-secondary" onclick="openTeams()">Équipes</button>
+    </div>
+    <div id="table-section">
+      <div class="search-input"><input type="text" id="table-filter" placeholder="Filtrer par nom..." oninput="filterTable()"></div>
+      <div class="table-wrap"><table><thead><tr><th>Joueur</th><th>Préc.</th><th>Impr.</th><th>Err.</th><th>Gaffes</th><th>Analysé</th></tr></thead><tbody id="table-body"></tbody></table></div>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:16px" onclick="reset()">Nouvelle analyse</button>
+  </div>
+</div>
+
+<!-- SEARCH MODAL -->
+<div id="search-modal" class="modal-overlay hidden" style="display:none" onclick="if(event.target===this)closeModal('search-modal')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('search-modal')">&times;</button>
+    <h3>Rechercher un joueur</h3>
+    <input type="text" id="search-player" placeholder="Nom du joueur..." oninput="searchPlayer()">
+    <div id="search-result" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- TEAMS MODAL -->
+<div id="teams-modal" class="modal-overlay hidden" style="display:none" onclick="if(event.target===this)closeModal('teams-modal')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('teams-modal')">&times;</button>
+    <h3>Statistiques par équipe</h3>
+    <div id="teams-content"></div>
+  </div>
+</div>
+
+<script>
+let DATA = null;
+
+function extractInfo(url) {
+  const m = url.match(/lichess\.org\/(tournament|swiss)\/([a-zA-Z0-9]+)/);
+  if (!m) return null;
+  return { id: m[2], type: m[1] === "swiss" ? "swiss" : "arena" };
+}
+
+async function analyze() {
+  const url = document.getElementById("url-input").value.trim();
+  const errEl = document.getElementById("error-msg");
+  errEl.classList.add("hidden");
+  const info = extractInfo(url);
+  if (!info) { errEl.textContent = "Lien invalide. Format : https://lichess.org/tournament/ID ou /swiss/ID"; errEl.classList.remove("hidden"); return; }
+
+  const btn = document.getElementById("analyze-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Analyse en cours...';
+
+  try {
+    const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tournamentId: info.id, type: info.type }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Erreur serveur");
+    DATA = data;
+    showResults();
+  } catch (e) {
+    errEl.textContent = e.message; errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false; btn.innerHTML = "Analyser le tournoi";
+  }
+}
+
+function showResults() {
+  document.getElementById("input-screen").classList.add("hidden");
+  document.getElementById("results-screen").classList.remove("hidden");
+  const d = DATA;
+  document.getElementById("r-name").textContent = d.tournamentName;
+  document.getElementById("r-info").textContent = `${d.playerCount} joueurs • ${d.gameCount} parties`;
+
+  // Info banner
+  let html = '<p class="title">Sources d\'analyse</p>';
+  html += `<p class="ok">Lichess : ${d.analyzedByLichess} partie${d.analyzedByLichess > 1 ? "s" : ""} analysée${d.analyzedByLichess > 1 ? "s" : ""}</p>`;
+  if (d.skippedShortGames > 0) html += `<p>${d.skippedShortGames} partie${d.skippedShortGames > 1 ? "s courtes ignorées" : " courte ignorée"} (timeouts)</p>`;
+  if (d.unanalyzedGames > 0) html += `<p class="warn">${d.unanalyzedGames} partie${d.unanalyzedGames > 1 ? "s" : ""} non analysée${d.unanalyzedGames > 1 ? "s" : ""} sur Lichess</p>`;
+  html += `<p>Total : ${d.totalAnalyzed}/${d.gameCount} parties couvertes</p>`;
+  html += `<p>Classement : ${d.eligiblePlayers} joueur${d.eligiblePlayers > 1 ? "s" : ""} éligible${d.eligiblePlayers > 1 ? "s" : ""} (≥4 parties analysées, ≥50%)</p>`;
+  document.getElementById("info-banner").innerHTML = html;
+
+  // Metrics
+  const m = d.metrics;
+  const cards = [
+    { label: "Meilleure précision", player: m.highestAccuracy.player, value: m.highestAccuracy.accuracy.toFixed(1) + "%", color: "var(--success)" },
+    { label: "Précision la plus faible", player: m.lowestAccuracy.player, value: m.lowestAccuracy.accuracy.toFixed(1) + "%", color: "var(--warning)" },
+    { label: "Moins d'imprécisions", player: m.leastInaccuracies.player, value: m.leastInaccuracies.count, color: "var(--success)" },
+    { label: "Plus d'imprécisions", player: m.mostInaccuracies.player, value: m.mostInaccuracies.count, color: "var(--warning)" },
+    { label: "Moins d'erreurs", player: m.leastMistakes.player, value: m.leastMistakes.count, color: "var(--success)" },
+    { label: "Plus d'erreurs", player: m.mostMistakes.player, value: m.mostMistakes.count, color: "var(--warning)" },
+    { label: "Moins de gaffes", player: m.leastBlunders.player, value: m.leastBlunders.count, color: "var(--success)" },
+    { label: "Plus de gaffes", player: m.mostBlunders.player, value: m.mostBlunders.count, color: "var(--error)" },
+  ];
+  document.getElementById("metrics-grid").innerHTML = cards.map(c => `<div class="metric"><div class="label">${c.label}</div><div class="player">${c.player}</div><div class="value" style="color:${c.color}">${c.value}</div></div>`).join("");
+
+  // Table
+  renderTable(DATA.playerMetrics);
+}
+
+function renderTable(players) {
+  const sorted = [...players].sort((a, b) => b.accuracy - a.accuracy);
+  document.getElementById("table-body").innerHTML = sorted.map(p =>
+    `<tr><td><strong>${p.username}</strong></td><td>${p.accuracy.toFixed(1)}%</td><td>${p.inaccuracies}</td><td>${p.mistakes}</td><td>${p.blunders}</td><td>${p.analyzedGames}/${p.gamesPlayed}</td></tr>`
+  ).join("");
+}
+
+function filterTable() {
+  const q = document.getElementById("table-filter").value.toLowerCase();
+  const filtered = DATA.playerMetrics.filter(p => p.username.toLowerCase().includes(q));
+  renderTable(filtered);
+}
+
+function reset() {
+  DATA = null;
+  document.getElementById("results-screen").classList.add("hidden");
+  document.getElementById("input-screen").classList.remove("hidden");
+  document.getElementById("url-input").value = "";
+}
+
+function openSearch() { document.getElementById("search-modal").style.display = "flex"; document.getElementById("search-player").value = ""; document.getElementById("search-result").innerHTML = ""; }
+function openTeams() {
+  document.getElementById("teams-modal").style.display = "flex";
+  const teams = {};
+  for (const p of DATA.playerMetrics) {
+    const t = p.team || "Sans équipe";
+    if (!teams[t]) teams[t] = { players: 0, totalAcc: 0, accCount: 0, inac: 0, mis: 0, blun: 0 };
+    teams[t].players++;
+    if (p.accuracy > 0) { teams[t].totalAcc += p.accuracy; teams[t].accCount++; }
+    teams[t].inac += p.inaccuracies; teams[t].mis += p.mistakes; teams[t].blun += p.blunders;
+  }
+  const sorted = Object.entries(teams).sort((a, b) => (b[1].accCount > 0 ? b[1].totalAcc / b[1].accCount : 0) - (a[1].accCount > 0 ? a[1].totalAcc / a[1].accCount : 0));
+  document.getElementById("teams-content").innerHTML = sorted.map(([name, s]) => {
+    const avg = s.accCount > 0 ? (s.totalAcc / s.accCount).toFixed(1) : "N/A";
+    return `<div class="team-card"><h4>${name}</h4><p>${s.players} joueurs • Précision moy. : ${avg}% • Impr: ${s.inac} • Err: ${s.mis} • Gaffes: ${s.blun}</p></div>`;
+  }).join("");
+}
+function closeModal(id) { document.getElementById(id).style.display = "none"; }
+
+function searchPlayer() {
+  const q = document.getElementById("search-player").value.toLowerCase();
+  if (!q) { document.getElementById("search-result").innerHTML = ""; return; }
+  const found = DATA.playerMetrics.filter(p => p.username.toLowerCase().includes(q));
+  if (!found.length) { document.getElementById("search-result").innerHTML = "<p style='color:var(--muted)'>Aucun joueur trouvé</p>"; return; }
+  document.getElementById("search-result").innerHTML = found.map(p =>
+    `<div class="card" style="margin-bottom:8px"><strong>${p.username}</strong>${p.team ? " • " + p.team : ""}<br>
+    <span style="font-size:0.85rem;color:var(--muted)">Précision : ${p.accuracy.toFixed(1)}% • Impr: ${p.inaccuracies} • Err: ${p.mistakes} • Gaffes: ${p.blunders} • Analysé : ${p.analyzedGames}/${p.gamesPlayed}</span></div>`
+  ).join("");
+}
+
+document.getElementById("url-input").addEventListener("keydown", e => { if (e.key === "Enter") analyze(); });
+</script>
+</body>
+</html>
