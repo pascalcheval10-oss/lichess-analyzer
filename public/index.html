@@ -122,6 +122,15 @@
 <script>
 let DATA = null;
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function extractInfo(url) {
   const m = url.match(/lichess\.org\/(tournament|swiss)\/([a-zA-Z0-9]+)/);
   if (!m) return null;
@@ -160,11 +169,13 @@ function showResults() {
   document.getElementById("r-info").textContent = `${d.playerCount} joueurs • ${d.gameCount} parties`;
 
   // Info banner
+  const partialCount = Math.max(0, Number(d.analyzedByLichess || 0) - Number(d.totalAnalyzed || 0));
   let html = '<p class="title">Sources d\'analyse</p>';
-  html += `<p class="ok">Lichess : ${d.analyzedByLichess} partie${d.analyzedByLichess > 1 ? "s" : ""} analysée${d.analyzedByLichess > 1 ? "s" : ""}</p>`;
+  html += `<p class="ok">Lichess : ${Number(d.analyzedByLichess || 0)} partie${d.analyzedByLichess > 1 ? "s" : ""} avec analyse disponible</p>`;
+  if (partialCount > 0) html += `<p>${partialCount} partie${partialCount > 1 ? "s" : ""} partiellement analysée${partialCount > 1 ? "s" : ""} (un seul joueur)</p>`;
   if (d.skippedShortGames > 0) html += `<p>${d.skippedShortGames} partie${d.skippedShortGames > 1 ? "s courtes ignorées" : " courte ignorée"} (timeouts)</p>`;
   if (d.unanalyzedGames > 0) html += `<p class="warn">${d.unanalyzedGames} partie${d.unanalyzedGames > 1 ? "s" : ""} non analysée${d.unanalyzedGames > 1 ? "s" : ""} sur Lichess</p>`;
-  html += `<p>Total : ${d.totalAnalyzed}/${d.gameCount} parties couvertes</p>`;
+  html += `<p>Total (2 joueurs analysés) : ${Number(d.totalAnalyzed || 0)}/${Number(d.gameCount || 0)} parties</p>`;
   html += `<p>Classement : ${d.eligiblePlayers} joueur${d.eligiblePlayers > 1 ? "s" : ""} éligible${d.eligiblePlayers > 1 ? "s" : ""} (≥4 parties analysées, ≥50%)</p>`;
   document.getElementById("info-banner").innerHTML = html;
 
@@ -180,7 +191,7 @@ function showResults() {
     { label: "Moins de gaffes", player: m.leastBlunders.player, value: m.leastBlunders.count, color: "var(--success)" },
     { label: "Plus de gaffes", player: m.mostBlunders.player, value: m.mostBlunders.count, color: "var(--error)" },
   ];
-  document.getElementById("metrics-grid").innerHTML = cards.map(c => `<div class="metric"><div class="label">${c.label}</div><div class="player">${c.player}</div><div class="value" style="color:${c.color}">${c.value}</div></div>`).join("");
+  document.getElementById("metrics-grid").innerHTML = cards.map(c => `<div class="metric"><div class="label">${c.label}</div><div class="player">${escapeHtml(c.player)}</div><div class="value" style="color:${c.color}">${c.value}</div></div>`).join("");
 
   // Table
   renderTable(DATA.playerMetrics);
@@ -189,7 +200,7 @@ function showResults() {
 function renderTable(players) {
   const sorted = [...players].sort((a, b) => b.accuracy - a.accuracy);
   document.getElementById("table-body").innerHTML = sorted.map(p =>
-    `<tr><td><strong>${p.username}</strong></td><td>${p.accuracy.toFixed(1)}%</td><td>${p.inaccuracies}</td><td>${p.mistakes}</td><td>${p.blunders}</td><td>${p.analyzedGames}/${p.gamesPlayed}</td></tr>`
+    `<tr><td><strong>${escapeHtml(p.username)}</strong></td><td>${p.accuracy.toFixed(1)}%</td><td>${p.inaccuracies}</td><td>${p.mistakes}</td><td>${p.blunders}</td><td>${p.analyzedGames}/${p.gamesPlayed}</td></tr>`
   ).join("");
 }
 
@@ -220,7 +231,7 @@ function openTeams() {
   const sorted = Object.entries(teams).sort((a, b) => (b[1].accCount > 0 ? b[1].totalAcc / b[1].accCount : 0) - (a[1].accCount > 0 ? a[1].totalAcc / a[1].accCount : 0));
   document.getElementById("teams-content").innerHTML = sorted.map(([name, s]) => {
     const avg = s.accCount > 0 ? (s.totalAcc / s.accCount).toFixed(1) : "N/A";
-    return `<div class="team-card"><h4>${name}</h4><p>${s.players} joueurs • Précision moy. : ${avg}% • Impr: ${s.inac} • Err: ${s.mis} • Gaffes: ${s.blun}</p></div>`;
+    return `<div class="team-card"><h4>${escapeHtml(name)}</h4><p>${s.players} joueurs • Précision moy. : ${avg}% • Impr: ${s.inac} • Err: ${s.mis} • Gaffes: ${s.blun}</p></div>`;
   }).join("");
 }
 function closeModal(id) { document.getElementById(id).style.display = "none"; }
@@ -231,7 +242,7 @@ function searchPlayer() {
   const found = DATA.playerMetrics.filter(p => p.username.toLowerCase().includes(q));
   if (!found.length) { document.getElementById("search-result").innerHTML = "<p style='color:var(--muted)'>Aucun joueur trouvé</p>"; return; }
   document.getElementById("search-result").innerHTML = found.map(p =>
-    `<div class="card" style="margin-bottom:8px"><strong>${p.username}</strong>${p.team ? " • " + p.team : ""}<br>
+    `<div class="card" style="margin-bottom:8px"><strong>${escapeHtml(p.username)}</strong>${p.team ? " • " + escapeHtml(p.team) : ""}<br>
     <span style="font-size:0.85rem;color:var(--muted)">Précision : ${p.accuracy.toFixed(1)}% • Impr: ${p.inaccuracies} • Err: ${p.mistakes} • Gaffes: ${p.blunders} • Analysé : ${p.analyzedGames}/${p.gamesPlayed}</span></div>`
   ).join("");
 }
